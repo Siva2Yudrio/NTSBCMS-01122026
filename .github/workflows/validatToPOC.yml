@@ -1,6 +1,6 @@
 name: Validate POC-Test-1 against POC (Delta  Validation)
 on:
-  workflow_dispatch
+  workflow_dispatch:
   push:
     branches:
       - POC-Test-1
