@@ -21,11 +21,35 @@ jobs:
         run: |
           echo Y | sfdx plugins:install sfdx-git-delta
           sfdx plugins
+      - name: 'Debug: show push range'
+        run: |
+          echo "BEFORE: ${{ github.event.before }}"
+          echo "AFTER : ${{ github.sha }}"
+          git --no-pager log --oneline -n 5
+          echo "Changed files in push range:"
+          git --no-pager diff --name-only ${{ github.event.before }} ${{ github.sha }}
       # 2. Generate the Delta (compares current HEAD to the previous commit)
       - name: 'Generate Delta package'
         run: |
           mkdir delta
           sf sgd:source:delta --to HEAD --from HEAD~1 --output delta/ --generate-delta
+      - name: 'Debug: list delta output'
+        run: |
+          echo "Delta folder structure:"
+          find delta -maxdepth 4 -type f -print
+          echo "Delta package.xml (if present):"
+          test -f delta/package/package.xml && cat delta/package/package.xml || echo "No delta/package/package.xml generated"
+      - name: 'Skip if nothing to deploy'
+        run: |
+          if [ ! -f "delta/package/package.xml" ]; then
+            echo "No package.xml generated. Skipping deploy."
+            exit 0
+          fi
+          # Optional: treat an empty package.xml as "nothing"
+          if ! grep -q "<types>" delta/package/package.xml; then
+            echo "package.xml has no types. Skipping deploy."
+            exit 0
+          fi
       - name: 'Prepare JWT Key'
         run: echo "${{ secrets.NTSBPOC_SERVER_KEY }}" > server.key
       - name: 'Authenticate'
