@@ -41,7 +41,7 @@ jobs:
             --from "origin/POC" \
             --output changed-sources/ \
             --generate-delta \
-            --source force-app/
+            --source force-app/**
           echo "[INFO] Delta package generated"
     
       - name: Check if delta exists
