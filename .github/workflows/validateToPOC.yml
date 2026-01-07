@@ -28,7 +28,10 @@ jobs:
       - name: Debug Git changes
         run: |
           git fetch origin POC
-          git diff --name-only origin/POC...HEAD    
+          echo "Current branch: $(git branch --show-current)"
+          echo "Comparing against origin/POC:"
+          git diff --name-only origin/POC...HEAD
+  
       - name: Create delta packages (for validate against POC)
         run: |
           mkdir -p changed-sources
