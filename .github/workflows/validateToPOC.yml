@@ -42,7 +42,7 @@ jobs:
             --to "HEAD" \
             --from "origin/POC" \
             --output changed-sources/ \
-            --generate-delta \
+            --generate-delta
           echo "[INFO] Delta package generated"
       - name: Check if delta exists
         run: |
