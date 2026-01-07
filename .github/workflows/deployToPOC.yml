@@ -1,11 +1,11 @@
 name: Deploy to POC
 on:
   workflow_dispatch: null
-push:
-  branches:
-    - POC
-  paths:
-    - force-app/**
+  push:
+    branches:
+      - POC
+    paths:
+      - force-app/**
 jobs:
   deploy-delta:
     runs-on: ubuntu-latest
