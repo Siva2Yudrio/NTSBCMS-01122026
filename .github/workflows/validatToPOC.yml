@@ -1,11 +1,13 @@
-name: Validate POC-Test-1 against POC (Delta  Validation)
+name: Validate POC-Test-1 against POC (Delta Validation)
+
 on:
   workflow_dispatch:
   push:
     branches:
       - POC-Test-1
     paths:
-      - force-app/**
+      - "force-app/**"
+
 jobs:
   validate-pr:
     runs-on: ubuntu-latest
@@ -14,25 +16,34 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Fetch baseline branch (POC)
         run: git fetch origin POC
+
       - name: Install Salesforce CLI
         run: npm install -g @salesforce/cli
+
       - name: Install sfdx-git-delta
         run: |
           echo "y" | sf plugins install sfdx-git-delta
+
       - name: Generate Delta package
-        run: >
+        run: |
           rm -rf delta
-
           mkdir -p delta
-
-          sf sgd:source:delta --to "HEAD" --from "origin/POC" --output delta/
-          --generate-delta
-
+          sf sgd:source:delta --to "HEAD" --from "origin/POC" --output delta/ --generate-delta
           echo "[INFO] Delta package generated"
+
       - name: Prepare JWT Key
-        run: 'echo "${{ secrets.NTSBPOC_SERVER_KEY }}" > server.key'
+        run: echo "${{ secrets.NTSBPOC_SERVER_KEY }}" > server.key
+
+      - name: Skip if no delta
+        run: |
+          if [ ! -f "delta/package/package.xml" ]; then
+            echo "No Salesforce metadata changes detected. Skipping validation."
+            exit 0
+          fi
+
       - name: Authenticate
         run: |
           sf org login jwt \
@@ -41,6 +52,7 @@ jobs:
             --username "${{ secrets.NTSBPOC_USER_NAME }}" \
             --instance-url "${{ vars.NTSBPOC_URL }}" \
             --set-default
+
       - name: Validate Delta Changes
         run: |
           sf project deploy validate \
