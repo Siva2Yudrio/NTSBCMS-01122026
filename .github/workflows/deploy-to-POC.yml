@@ -1,0 +1,71 @@
+name: deploy-To-POC 
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - POC-Test-1
+    paths:
+      - force-app/**
+	  
+jobs:
+  Deploy-to-POC-environment:
+    runs-on: ubuntu-latest
+    environment: NTSBPOC
+    
+    steps:
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Install Salesforce CLI
+        run: npm install @salesforce/cli --global
+        
+      - name: Install sfdx-git-delta
+        run: |
+          echo Y | sfdx plugins:install sfdx-git-delta
+          sfdx plugins
+          
+      - name: Create delta packages (for deploy to POC)
+        run: |
+          mkdir -p changed-sources
+          git fetch origin POC
+
+          # Generate delta: changes in POC-Test-1 compared to POC
+          sf sgd source delta \
+            --to "HEAD" \
+            --from "origin/POC" \
+            --output changed-sources/ \
+            --generate-delta \
+            --source force-app/
+          echo "[INFO] Delta package generated"
+    
+      - name: Check if delta exists
+        run: |
+          if [ ! -d "changed-sources/force-app" ]; then
+            echo "No Salesforce changes detected. Skipping validation."
+            exit 0
+          fi          
+          
+      - name: Authenticate to NTSB POC ORG
+        run: |
+          echo "${{ secrets.NTSBPOC_SERVER_KEY }}" > server.key
+          sf org login jwt \
+            --username ${{ secrets.NTSBPOC_USER_NAME }} \
+            --jwt-key-file server.key \
+            --client-id ${{ secrets.NTSBPOC_CONSUMER_KEY }} \
+            --instance-url ${{ vars.NTSBPOC_URL }} \
+            --set-default
+            
+      - name: Deployment to POC
+        run: |
+          sf project deploy start \
+            --source-dir changed-sources/force-app \
+            --test-level RunLocalTests \
+            --wait 30
+            echo "[INFO] Deployment to POC completed"
