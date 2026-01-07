@@ -1,4 +1,4 @@
-name: Validate POC-Test-1 against POC (Delta Validation)
+name: Validate POC-Test-1 against POC
 on:
   workflow_dispatch: null
   push:
