@@ -1,9 +1,9 @@
 name: deploy-To-POC
-'on':
-  workflow_dispatch: null
+on:
+  workflow_dispatch:
   push:
     branches:
-      - POC-Test-1
+      - POC
     paths:
       - force-app/**
 jobs:
