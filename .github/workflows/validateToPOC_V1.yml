@@ -1,4 +1,4 @@
-name: validate-To-POC
+name: validate-To-POC-V1
 'on':
   workflow_dispatch: null
   push:
