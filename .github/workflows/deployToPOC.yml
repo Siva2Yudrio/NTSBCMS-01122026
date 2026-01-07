@@ -19,8 +19,8 @@ jobs:
       # 1. Install the sfdx-git-delta plugin
       - name: 'Install sfdx-git-delta'
         run: |
-          echo 'y' | sf plugins install sfdx-git-delta
-          sf sgd --version
+          echo Y | sfdx plugins:install sfdx-git-delta
+          sfdx plugins
       # 2. Generate the Delta (compares current HEAD to the previous commit)
       - name: 'Generate Delta package'
         run: |
