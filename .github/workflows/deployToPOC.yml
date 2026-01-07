@@ -1,5 +1,4 @@
 name: Deploy to POC
-
 on:
   workflow_dispatch:
   push:
