@@ -47,9 +47,8 @@ jobs:
             --instance-url "${{ vars.NTSBPOC_URL }}" \
             --set-default
       - name: Validate Delta Changes
-        run: >
+        run: |
           sf project deploy validate \
             --manifest delta/package/package.xml \
-            --post-destructive-changes delta/destructiveChanges/destructiveChanges.xml \
             --wait 10 \
             --test-level RunLocalTests
