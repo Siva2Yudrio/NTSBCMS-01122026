@@ -1,4 +1,4 @@
-name: deploy-To-POC
+name: deploy-To-POC_V1
 on:
   workflow_dispatch:
   push:
