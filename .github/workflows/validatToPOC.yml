@@ -1,5 +1,5 @@
 name: Validate POC-Test-1 against POC (Delta Validation)
-'on':
+on:
   push:
     branches:
       - POC-Test-1
