@@ -1,6 +1,6 @@
 name: Deploy to POC
 on:
-  workflow_dispatch:
+  workflow_dispatch: null
 push:
   branches:
     - POC
