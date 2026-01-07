@@ -1,11 +1,11 @@
 name: Validate POC-Test-1 against POC (Delta Validation)
 on:
+  workflow_dispatch: null
   push:
     branches:
       - POC-Test-1
     paths:
       - force-app/**
-  workflow_dispatch: null
 jobs:
   validate-pr:
     runs-on: ubuntu-latest
