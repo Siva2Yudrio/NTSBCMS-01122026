@@ -2,13 +2,9 @@ name: PR Validation (Feature->POC,Feature->DEV, DEV->QA, QA->UAT, UAT->main)
 
 on:
   pull_request:
-    branches: [ "POC", "DEV", "QA", "UAT", "main" ]
+    branches: ["POC", "DEV", "QA", "UAT", "main"]
     paths:
       - "force-app/**"
-    paths-ignore:
-      - ".github/workflows/**"
-      - "**/*.md"
-      - "docs/**"
   workflow_dispatch:
 
 jobs:
@@ -94,23 +90,23 @@ jobs:
               echo "SF_INSTANCE_URL=${{ vars.NTSBPOC_URL }}" >> $GITHUB_OUTPUT
               ;;
             DEV)
-              echo "SF_USERNAME=${{ secrets.SF_USERNAME_DEV }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_DEV }}" >> $GITHUB_OUTPUT
+              echo "SF_USERNAME=${{ secrets.NTSBDEV_USER_NAME }}" >> $GITHUB_OUTPUT
+              echo "SF_CONSUMER_KEY=${{ secrets.NTSBDEV_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
               echo "SF_INSTANCE_URL=${{ vars.NTSBDEV_URL }}" >> $GITHUB_OUTPUT
               ;;
             QA)
-              echo "SF_USERNAME=${{ secrets.SF_USERNAME_QA }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_QA }}" >> $GITHUB_OUTPUT
+              echo "SF_USERNAME=${{ secrets.NTSBQA_USER_NAME }}" >> $GITHUB_OUTPUT
+              echo "SF_CONSUMER_KEY=${{ secrets.NTSBQA_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
               echo "SF_INSTANCE_URL=${{ vars.NTSBQA_URL }}" >> $GITHUB_OUTPUT
               ;;
             UAT)
-              echo "SF_USERNAME=${{ secrets.SF_USERNAME_UAT }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_UAT }}" >> $GITHUB_OUTPUT
+              echo "SF_USERNAME=${{ secrets.NTSBUAT_USER_NAME }}" >> $GITHUB_OUTPUT
+              echo "SF_CONSUMER_KEY=${{ secrets.NTSBUAT_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
               echo "SF_INSTANCE_URL=${{ vars.NTSBUAT_URL }}" >> $GITHUB_OUTPUT
               ;;
             main)
-              echo "SF_USERNAME=${{ secrets.SF_USERNAME_PROD }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_PROD }}" >> $GITHUB_OUTPUT
+              echo "SF_USERNAME=${{ secrets.NTSBCMS_USER_NAME }}" >> $GITHUB_OUTPUT
+              echo "SF_CONSUMER_KEY=${{ secrets.NTSBCMS_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
               echo "SF_INSTANCE_URL=${{ vars.NTSBCMS_URL }}" >> $GITHUB_OUTPUT
               ;;
             *)
