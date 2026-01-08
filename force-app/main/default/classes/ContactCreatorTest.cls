@@ -5,34 +5,40 @@ public with sharing class ContactCreatorTest {
     static void testCreateMinimalContactSuccess() {
 
         Test.startTest();
-
-        Contact created = ContactCreator.createMinimalContact('TestLastName');
-
+        Contact created = ContactCreator.createMinimalContact('TestLastName', 'TestFirstName');
         Test.stopTest();
 
-        System.assertNotEquals(null, created.Id, 'Contact record should be inserted.');
-        System.assertEquals('TestLastName', created.LastName, 'LastName should match the input parameter.');
+        System.assertNotEquals(null, created.Id,
+            'Contact record should be inserted.');
+        System.assertEquals('TestLastName', created.LastName,
+            'LastName should match the input parameter.');
+        System.assertEquals('TestFirstName', created.FirstName,
+            'FirstName should match the input parameter.');
     }
 
     @isTest
     static void testCreateMinimalContactException() {
 
-        Boolean isException = false;
+        Boolean isExceptionThrown = false;
 
         try {
             Test.startTest();
-
-            ContactCreator.createMinimalContact('');
-
+            ContactCreator.createMinimalContact('', 'TestFirstName');
             Test.stopTest();
         } catch (IllegalArgumentException ex) {
-            isException = true;
+            isExceptionThrown = true;
 
-            System.assertEquals('lastName is required.', ex.getMessage(), 
-                'Exception message should match the one defined in the class.');
+            System.assertEquals(
+                'LastName is required.',
+                ex.getMessage(),
+                'Exception message should match the one defined in the class.'
+            );
         }
 
-        System.assertEquals(true, isException, 
-            'IllegalArgumentException should be thrown when LastName is blank.');
+        System.assertEquals(
+            true,
+            isExceptionThrown,
+            'IllegalArgumentException should be thrown when LastName is blank.'
+        );
     }
 }

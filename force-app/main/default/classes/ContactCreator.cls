@@ -4,18 +4,21 @@ public with sharing class ContactCreator {
      * Creates a Contact with the minimum fields typically required.
      * Standard requirement: LastName.
      *
-     * @param lastName Contact last name (required)
+     * @param lastName  Contact last name (required)
+     * @param firstName Contact first name (optional)
      * @return The inserted Contact record (with Id populated)
      */
-    public static Contact createMinimalContact(String lastName) {
+    public static Contact createMinimalContact(String lastName, String firstName) {
         if (String.isBlank(lastName)) {
-            throw new IllegalArgumentException('lastName is required.');
+            throw new IllegalArgumentException('LastName is required.');
         }
 
         Contact c = new Contact(
-            LastName = lastName
+            LastName  = lastName,
+            FirstName = firstName
         );
 
         insert c;
         return c;
     }
+}
