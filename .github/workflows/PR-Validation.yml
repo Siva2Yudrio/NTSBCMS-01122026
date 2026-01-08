@@ -1,138 +1,150 @@
 name: PR Validation (Feature->POC,Feature->DEV, DEV->QA, QA->UAT, UAT->main)
 
 on:
-  pull_request:
-    branches: ["POC", "DEV", "QA", "UAT", "main"]
-    paths:
-      - "force-app/**"
-  workflow_dispatch:
+    pull_request:
+        branches: ["POC", "DEV", "QA", "UAT", "main"]
+        paths:
+            - "force-app/**"
+    workflow_dispatch:
+        inputs:
+            base_branch:
+                description: "Target branch to compare against (e.g., DEV, QA, UAT, main, POC)"
+                required: true
+                default: "DEV"
+            head_branch:
+                description: "Source branch to validate (e.g., POC-Test-2)"
+                required: true
 
 jobs:
-  validate-delta:
-    runs-on: ubuntu-latest
+    validate-delta:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout PR source (HEAD)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        steps:
+            - name: Checkout PR head (or dispatch head branch)
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event.inputs.head_branch }}
 
-      - name: Debug branch context
-        run: |
-          echo "Base (target) branch: ${{ github.base_ref }}"
-          echo "Head (source) branch: ${{ github.head_ref }}"
-          echo "Event: ${{ github.event_name }}"
-          git log -1 --oneline
+            - name: Debug branch context
+              run: |
+                  echo "Event: ${{ github.event_name }}"
+                  echo "PR base_ref: ${{ github.base_ref }}"
+                  echo "PR head_ref: ${{ github.head_ref }}"
+                  echo "Dispatch base_branch: ${{ github.event.inputs.base_branch }}"
+                  echo "Dispatch head_branch: ${{ github.event.inputs.head_branch }}"
+                  git log -1 --oneline
 
-      - name: Install Salesforce CLI
-        run: |
-          npm install -g @salesforce/cli
-          sf --version
+            - name: Install Salesforce CLI
+              run: |
+                  npm install -g @salesforce/cli
+                  sf --version
 
-      - name: Install sfdx-git-delta
-        run: |
-          echo "y" | sf plugins install sfdx-git-delta
-          sf plugins
+            - name: Install sfdx-git-delta
+              run: |
+                  echo "y" | sf plugins install sfdx-git-delta
+                  sf plugins
 
-      - name: Fetch base branch for delta
-        run: |
-          if [ -n "${{ github.base_ref }}" ]; then
-            git fetch origin "${{ github.base_ref }}"
-          else
-            echo "[WARN] github.base_ref is empty (likely workflow_dispatch). Skipping base fetch."
-          fi
+            - name: Fetch base for delta
+              run: |
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    git fetch origin "${{ github.base_ref }}" --depth=0 || git fetch origin "${{ github.base_ref }}"
+                  else
+                    git fetch origin "${{ github.event.inputs.base_branch }}" --depth=0 || git fetch origin "${{ github.event.inputs.base_branch }}"
+                  fi
 
-      - name: Generate delta package vs base branch
-        run: |
-          rm -rf changed-sources
-          mkdir -p changed-sources
+            - name: Generate delta package
+              run: |
+                  rm -rf changed-sources
+                  mkdir -p changed-sources
 
-          if [ -z "${{ github.base_ref }}" ]; then
-            echo "[WARN] github.base_ref is empty (workflow_dispatch). Delta generation requires a base branch."
-            echo "       Run this workflow from a PR, or enhance workflow_dispatch with a target branch input."
-            exit 1
-          fi
+                  if [ "${{ github.event_name }}" = "pull_request" ]; then
+                    FROM_SHA="${{ github.event.pull_request.base.sha }}"
+                    TO_SHA="${{ github.event.pull_request.head.sha }}"
+                    BASE_BRANCH="${{ github.base_ref }}"
+                  else
+                    # compare head branch against base branch for manual runs
+                    BASE_BRANCH="${{ github.event.inputs.base_branch }}"
+                    git fetch origin "${{ github.event.inputs.head_branch }}" --depth=0 || git fetch origin "${{ github.event.inputs.head_branch }}"
+                    FROM_SHA="origin/${BASE_BRANCH}"
+                    TO_SHA="HEAD"
+                  fi
 
-          sf sgd source delta \
-            --to "HEAD" \
-            --from "origin/${{ github.base_ref }}" \
-            --output-dir "changed-sources" \
-            --generate-delta \
-            --source-dir "force-app"
+                  echo "[INFO] Delta FROM: $FROM_SHA"
+                  echo "[INFO] Delta TO:   $TO_SHA"
+                  echo "[INFO] Base branch: $BASE_BRANCH"
 
-          echo "[INFO] Delta generation complete."
-          echo "[INFO] Delta contents:"
-          ls -R changed-sources || true
+                  sf sgd source delta \
+                    --from "$FROM_SHA" \
+                    --to "$TO_SHA" \
+                    --output-dir "changed-sources" \
+                    --generate-delta \
+                    --source-dir "force-app"
 
-      - name: Stop if no Salesforce changes detected
-        run: |
-          if [ ! -d "changed-sources/force-app" ]; then
-            echo "No Salesforce changes detected in force-app. Skipping validation."
-            exit 0
-          fi
+                  echo "[INFO] Delta contents:"
+                  ls -R changed-sources || true
 
-      - name: Select target org secrets based on PR base branch
-        id: target
-        run: |
-          BASE="${{ github.base_ref }}"
+            - name: Stop if no Salesforce changes detected
+              run: |
+                  if [ ! -d "changed-sources/force-app" ]; then
+                    echo "No Salesforce changes detected in force-app. Skipping validation."
+                    exit 0
+                  fi
 
-          if [ -z "$BASE" ]; then
-            echo "[WARN] BASE is empty (workflow_dispatch). Defaulting to DEV."
-            BASE="DEV"
-          fi
+            - name: Select target org secrets (set env vars)
+              run: |
+                  BASE="${{ github.event_name == 'pull_request' && github.base_ref || github.event.inputs.base_branch }}"
 
-          echo "BASE_BRANCH=$BASE" >> $GITHUB_OUTPUT
+                  case "$BASE" in
+                    POC)
+                      echo "SF_USERNAME=${{ secrets.NTSBPOC_USER_NAME }}" >> $GITHUB_ENV
+                      echo "SF_CONSUMER_KEY=${{ secrets.NTSBPOC_CONSUMER_KEY }}" >> $GITHUB_ENV
+                      echo "SF_INSTANCE_URL=${{ vars.NTSBPOC_URL }}" >> $GITHUB_ENV
+                      ;;
+                    DEV)
+                      echo "SF_USERNAME=${{ secrets.SF_USERNAME_DEV }}" >> $GITHUB_ENV
+                      echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_DEV }}" >> $GITHUB_ENV
+                      echo "SF_INSTANCE_URL=${{ vars.NTSBDEV_URL }}" >> $GITHUB_ENV
+                      ;;
+                    QA)
+                      echo "SF_USERNAME=${{ secrets.SF_USERNAME_QA }}" >> $GITHUB_ENV
+                      echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_QA }}" >> $GITHUB_ENV
+                      echo "SF_INSTANCE_URL=${{ vars.NTSBQA_URL }}" >> $GITHUB_ENV
+                      ;;
+                    UAT)
+                      echo "SF_USERNAME=${{ secrets.SF_USERNAME_UAT }}" >> $GITHUB_ENV
+                      echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_UAT }}" >> $GITHUB_ENV
+                      echo "SF_INSTANCE_URL=${{ vars.NTSBUAT_URL }}" >> $GITHUB_ENV
+                      ;;
+                    main)
+                      echo "SF_USERNAME=${{ secrets.SF_USERNAME_PROD }}" >> $GITHUB_ENV
+                      echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_PROD }}" >> $GITHUB_ENV
+                      echo "SF_INSTANCE_URL=${{ vars.NTSBCMS_URL }}" >> $GITHUB_ENV
+                      ;;
+                    *)
+                      echo "Unsupported base branch: $BASE"
+                      exit 1
+                      ;;
+                  esac
 
-          case "$BASE" in
-            POC)
-              echo "SF_USERNAME=${{ secrets.NTSBPOC_USER_NAME }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.NTSBPOC_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
-              echo "SF_INSTANCE_URL=${{ vars.NTSBPOC_URL }}" >> $GITHUB_OUTPUT
-              ;;
-            DEV)
-              echo "SF_USERNAME=${{ secrets.NTSBDEV_USER_NAME }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.NTSBDEV_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
-              echo "SF_INSTANCE_URL=${{ vars.NTSBDEV_URL }}" >> $GITHUB_OUTPUT
-              ;;
-            QA)
-              echo "SF_USERNAME=${{ secrets.NTSBQA_USER_NAME }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.NTSBQA_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
-              echo "SF_INSTANCE_URL=${{ vars.NTSBQA_URL }}" >> $GITHUB_OUTPUT
-              ;;
-            UAT)
-              echo "SF_USERNAME=${{ secrets.NTSBUAT_USER_NAME }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.NTSBUAT_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
-              echo "SF_INSTANCE_URL=${{ vars.NTSBUAT_URL }}" >> $GITHUB_OUTPUT
-              ;;
-            main)
-              echo "SF_USERNAME=${{ secrets.NTSBCMS_USER_NAME }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.NTSBCMS_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
-              echo "SF_INSTANCE_URL=${{ vars.NTSBCMS_URL }}" >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "Unsupported PR base branch: $BASE"
-              exit 1
-              ;;
-          esac
+            - name: Authenticate to target org (JWT)
+              run: |
+                  echo "${{ secrets.SF_JWT_KEY }}" > server.key
 
-      - name: Authenticate to target org (JWT)
-        run: |
-          echo "${{ secrets.SF_JWT_KEY }}" > server.key
+                  sf org login jwt \
+                    --client-id "$SF_CONSUMER_KEY" \
+                    --jwt-key-file server.key \
+                    --username "$SF_USERNAME" \
+                    --instance-url "$SF_INSTANCE_URL" \
+                    --set-default
 
-          sf org login jwt \
-            --client-id "${{ steps.target.outputs.SF_CONSUMER_KEY }}" \
-            --jwt-key-file server.key \
-            --username "${{ steps.target.outputs.SF_USERNAME }}" \
-            --instance-url "${{ steps.target.outputs.SF_INSTANCE_URL }}" \
-            --set-default
+                  sf org display --verbose
 
-          sf org display --verbose
+            - name: Validate delta deployment (check-only)
+              run: |
+                  sf project deploy start \
+                    --source-dir "changed-sources/force-app" \
+                    --test-level RunLocalTests \
+                    --dry-run
 
-      - name: Validate delta deployment (check-only)
-        run: |
-          sf project deploy start \
-            --source-dir "changed-sources/force-app" \
-            --test-level RunLocalTests \
-            --dry-run
-
-          echo "[INFO] Validation (check-only) completed."
+                  echo "[INFO] Validation (check-only) completed."
