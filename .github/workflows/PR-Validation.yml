@@ -90,8 +90,8 @@ jobs:
               echo "SF_INSTANCE_URL=${{ vars.NTSBPOC_URL }}" >> $GITHUB_OUTPUT
               ;;
             DEV)
-              echo "SF_USERNAME=${{ secrets.SF_USERNAME_DEV }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_DEV }}" >> $GITHUB_OUTPUT
+              echo "SF_USERNAME=${{ secrets.NTSBDEV_USER_NAME }}" >> $GITHUB_OUTPUT
+              echo "SF_CONSUMER_KEY=${{ secrets.NTSBDEV_CONSUMER_KEY }}" >> $GITHUB_OUTPUT
               echo "SF_INSTANCE_URL=${{ vars.NTSBDEV_URL }}" >> $GITHUB_OUTPUT
               ;;
             *)
