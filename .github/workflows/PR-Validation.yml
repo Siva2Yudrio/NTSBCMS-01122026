@@ -1,14 +1,10 @@
-name: PR Validation (Feature->POC,Feature->DEV, DEV->QA, QA->UAT, UAT->main)
+name: PR Validation (Feature->POC,Feature->DEV)
 
 on:
   pull_request:
-    branches: [ "POC", "DEV", "QA", "UAT", "main" ]
+    branches: ["POC", "DEV"]
     paths:
       - "force-app/**"
-    paths-ignore:
-      - ".github/workflows/**"
-      - "**/*.md"
-      - "docs/**"
   workflow_dispatch:
 
 jobs:
@@ -97,21 +93,6 @@ jobs:
               echo "SF_USERNAME=${{ secrets.SF_USERNAME_DEV }}" >> $GITHUB_OUTPUT
               echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_DEV }}" >> $GITHUB_OUTPUT
               echo "SF_INSTANCE_URL=${{ vars.NTSBDEV_URL }}" >> $GITHUB_OUTPUT
-              ;;
-            QA)
-              echo "SF_USERNAME=${{ secrets.SF_USERNAME_QA }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_QA }}" >> $GITHUB_OUTPUT
-              echo "SF_INSTANCE_URL=${{ vars.NTSBQA_URL }}" >> $GITHUB_OUTPUT
-              ;;
-            UAT)
-              echo "SF_USERNAME=${{ secrets.SF_USERNAME_UAT }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_UAT }}" >> $GITHUB_OUTPUT
-              echo "SF_INSTANCE_URL=${{ vars.NTSBUAT_URL }}" >> $GITHUB_OUTPUT
-              ;;
-            main)
-              echo "SF_USERNAME=${{ secrets.SF_USERNAME_PROD }}" >> $GITHUB_OUTPUT
-              echo "SF_CONSUMER_KEY=${{ secrets.SF_CONSUMER_KEY_PROD }}" >> $GITHUB_OUTPUT
-              echo "SF_INSTANCE_URL=${{ vars.NTSBCMS_URL }}" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "Unsupported PR base branch: $BASE"
