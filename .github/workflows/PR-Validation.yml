@@ -79,13 +79,21 @@ jobs:
               echo "SF_USERNAME=${{ secrets.NTSBPOC_USER_NAME }}" >> $GITHUB_ENV
               echo "SF_CONSUMER_KEY=${{ secrets.NTSBPOC_CONSUMER_KEY }}" >> $GITHUB_ENV
               echo "SF_INSTANCE_URL=${{ vars.NTSBPOC_URL }}" >> $GITHUB_ENV
-              echo "JWT_KEY=${{ secrets.NTSBPOC_SERVER_KEY }}" >> $GITHUB_ENV
+              {
+                echo "JWT_KEY<<EOF"
+                echo "${{ secrets.NTSBPOC_SERVER_KEY }}"
+                echo "EOF"
+              } >> $GITHUB_ENV
               ;;
             DEV)
               echo "SF_USERNAME=${{ secrets.NTSBDEV_USER_NAME }}" >> $GITHUB_ENV
               echo "SF_CONSUMER_KEY=${{ secrets.NTSBDEV_CONSUMER_KEY }}" >> $GITHUB_ENV
               echo "SF_INSTANCE_URL=${{ vars.NTSBDEV_URL }}" >> $GITHUB_ENV
-              echo "JWT_KEY=${{ secrets.NTSBDEV_SERVER_KEY }}" >> $GITHUB_ENV
+              {
+                echo "JWT_KEY<<EOF"
+                echo "${{ secrets.NTSBDEV_SERVER_KEY }}"
+                echo "EOF"
+              } >> $GITHUB_ENV
               ;;
             *)
               echo "Unsupported PR base branch: $BASE"
