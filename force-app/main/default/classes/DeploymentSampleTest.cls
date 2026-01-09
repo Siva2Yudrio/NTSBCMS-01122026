@@ -1,16 +1,22 @@
 @IsTest
 private class DeploymentSampleTest {
-    // GitHub workflow PR validation test-01092026-Test-5
+
     @IsTest
-    static void testGetStatus() {
+    static void testGetStatus_returnsExpectedValue() {
         // Act
         String result = DeploymentSample.getStatus();
 
         // Assert
-        System.assertEquals(
-            '***01/09/2026***DEPLOYMENT_OK',
+        System.assertNotEquals(
+            null,
             result,
-            'Deployment smoke test failed'
+            'getStatus() should not return null'
+        );
+
+        System.assertEquals(
+            '***01/09/2026***Validation Test-4',
+            result,
+            'DeploymentSample.getStatus() returned an unexpected value'
         );
     }
 }
