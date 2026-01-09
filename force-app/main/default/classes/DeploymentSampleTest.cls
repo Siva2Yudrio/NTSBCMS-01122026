@@ -1,6 +1,6 @@
 @IsTest
 private class DeploymentSampleTest {
-
+    // GitHub workflow PR validation test-01092026-Test-5
     @IsTest
     static void testGetStatus() {
         // Act
