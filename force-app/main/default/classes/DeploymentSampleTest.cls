@@ -4,7 +4,7 @@ private class DeploymentSampleTest {
     @IsTest
     static void testGetStatus() {
         // Act
-        String result = DeploymentSampleTest.getStatus();
+        String result = DeploymentSample.getStatus();
 
         // Assert
         System.assertEquals(
