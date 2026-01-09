@@ -1,4 +1,4 @@
-name: Deploy Full to POC
+name: Deploy Full to POC-Good
 on:
   workflow_dispatch: null
   push:
