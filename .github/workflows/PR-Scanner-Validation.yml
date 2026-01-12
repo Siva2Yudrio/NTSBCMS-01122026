@@ -66,18 +66,21 @@ jobs:
 
       - name: Install Salesforce Code Analyzer
         if: steps.check_changes.outputs.has_changes == 'true'
-        run: sf plugins install @salesforce/sfdx-scanner
+        run: |
+          # v4 is retired; install the 2026 v5 plugin
+          sf plugins install code-analyzer
+          sf plugins
 
       - name: Run Code Analyzer (Critical gate)
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           # 2026 Best Practice: Run once with multiple formats and severity threshold
           # This command fails automatically if Severity 1 violations are found.
-          sf scanner run \
-            --target "changed-sources/force-app" \
-            --format sarif --outfile scanner-results.sarif \
-            --format json --outfile scanner-results.json \
-            --severity-threshold 1
+          sf code-analyzer run \
+            --path "changed-sources/force-app" \
+            --output-file scanner-results.sarif \
+            --output-file --outfile scanner-results.json \
+            --fail-on-severity 1
 
       - name: Upload SARIF to GitHub Code Scanning
         if: always() && steps.check_changes.outputs.has_changes == 'true'
