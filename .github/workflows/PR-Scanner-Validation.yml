@@ -72,19 +72,20 @@ jobs:
           sf plugins
 
       - name: Run Code Analyzer (Critical gate)
+        id: run_analyzer
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # 2026 Best Practice: Run once with multiple formats and severity threshold
-          # This command fails automatically if Severity 1 violations are found.
+          # Use v5 syntax
           sf code-analyzer run \
             --path "changed-sources/force-app" \
             --output-file scanner-results.sarif \
-            --output-file --outfile scanner-results.json \
+            --output-file scanner-results.json \
             --fail-on-severity 1
 
       - name: Upload SARIF to GitHub Code Scanning
+        # IMPORTANT: 'always()' ensures this runs even if the previous step failed
         if: always() && steps.check_changes.outputs.has_changes == 'true'
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4  # Updated to v4 for 2026
         with:
           sarif_file: scanner-results.sarif
 
