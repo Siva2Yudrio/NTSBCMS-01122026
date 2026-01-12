@@ -65,7 +65,7 @@ jobs:
 
       - name: Stop if no Salesforce changes detected
         run: |
-          if [ ! -d "changed-sources/force-app" ]; then
+          if ! find changed-sources/force-app -type f | grep -q .; then
             echo "No Salesforce changes detected. Skipping."
             exit 0
           fi
