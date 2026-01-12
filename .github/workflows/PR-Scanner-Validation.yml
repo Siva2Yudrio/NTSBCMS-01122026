@@ -1,0 +1,207 @@
+name: PR Scanner Validation (Feature->POC, Feature->DEV)
+
+permissions:
+  contents: read
+  security-events: write
+
+on:
+  pull_request:
+    branches: ["POC", "DEV"]
+    paths:
+      - "force-app/**"
+
+jobs:
+  validate-delta:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR HEAD (deterministic)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Debug context (safe)
+        run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Base (target) branch: ${{ github.base_ref }}"
+          echo "Head (source) branch: ${{ github.head_ref }}"
+          echo "Base SHA: ${{ github.event.pull_request.base.sha }}"
+          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
+          git log -1 --oneline
+
+      - name: Install Salesforce CLI + tools
+        run: |
+          npm install -g @salesforce/cli
+          sf --version
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Install sfdx-git-delta
+        run: |
+          echo "y" | sf plugins install sfdx-git-delta
+          sf plugins
+
+      - name: Generate delta (PR base -> PR head)
+        run: |
+          rm -rf changed-sources
+          mkdir -p changed-sources
+
+          FROM_SHA="${{ github.event.pull_request.base.sha }}"
+          TO_SHA="${{ github.event.pull_request.head.sha }}"
+
+          echo "Delta FROM: $FROM_SHA"
+          echo "Delta TO:   $TO_SHA"
+
+          sf sgd source delta \
+            --from "$FROM_SHA" \
+            --to "$TO_SHA" \
+            --output-dir "changed-sources" \
+            --generate-delta \
+            --source-dir "force-app"
+
+          echo "Delta folder tree:"
+          find changed-sources -maxdepth 4 -type d -print
+
+      - name: Stop if no Salesforce changes detected
+        run: |
+          if [ ! -d "changed-sources/force-app" ]; then
+            echo "No Salesforce changes detected. Skipping."
+            exit 0
+          fi
+
+      # ----------------------------
+      # Salesforce Code Analyzer (SARIF + Critical gate) -- START--
+      # ----------------------------
+      - name: Install Salesforce Code Analyzer
+        run: |
+          sf plugins install @salesforce/sfdx-scanner
+          sf plugins
+
+      - name: Run Code Analyzer (produce SARIF + JSON)
+        run: |
+          rm -f scanner-results.sarif scanner-results.json
+
+          echo "[INFO] Running Code Analyzer on delta sources (SARIF)..."
+          sf scanner run \
+            --target "changed-sources/force-app" \
+            --format sarif \
+            --outfile scanner-results.sarif \
+            || true
+
+          echo "[INFO] Running Code Analyzer on delta sources (JSON)..."
+          sf scanner run \
+            --target "changed-sources/force-app" \
+            --format json \
+            --outfile scanner-results.json \
+            || true
+
+          echo "[INFO] Code Analyzer outputs:"
+          ls -la scanner-results.sarif scanner-results.json || true
+
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: scanner-results.sarif
+
+      - name: Upload analyzer reports as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: salesforce-code-analyzer-reports
+          path: |
+            scanner-results.sarif
+            scanner-results.json
+          if-no-files-found: warn
+
+      - name: Check for Critical Violations (Severity 1)
+        run: |
+          if [ ! -s scanner-results.json ]; then
+            echo "[INFO] No JSON findings file (or empty). Treating as no violations."
+            exit 0
+          fi
+
+          # Try to count any "severity": 1 occurrences in the JSON (robust recursive scan).
+          # If the JSON schema changes, fallback grep still catches the common pattern.
+          CRIT_COUNT="$(jq -r '[.. | objects | select(has("severity")) | .severity | select(.==1)] | length' scanner-results.json 2>/dev/null || echo 0)"
+          if ! [[ "$CRIT_COUNT" =~ ^[0-9]+$ ]]; then
+            CRIT_COUNT=0
+          fi
+
+          # Fallback (extra safety)
+          GREP_COUNT="$(grep -Eo '"severity"\s*:\s*1' scanner-results.json | wc -l | tr -d ' ')"
+          if [[ "$GREP_COUNT" =~ ^[0-9]+$ ]] && [ "$GREP_COUNT" -gt "$CRIT_COUNT" ]; then
+            CRIT_COUNT="$GREP_COUNT"
+          fi
+
+          echo "[INFO] Critical (Severity 1) violations found: $CRIT_COUNT"
+
+          if [ "$CRIT_COUNT" -gt 0 ]; then
+            echo "[ERROR] Code Analyzer found Severity 1 (Critical) violations. Failing the job."
+            echo "[INFO] Printing JSON findings (truncated to first 300 lines):"
+            sed -n '1,300p' scanner-results.json || true
+            exit 1
+          fi
+
+          echo "[INFO] No Severity 1 violations found."
+      # ----------------------------
+      # Salesforce Code Analyzer (SARIF + Critical gate) -- END--
+      # ----------------------------
+
+      - name: Select target org (POC/DEV) + create JWT key file
+        run: |
+          BASE="${{ github.base_ref }}"
+
+          if [ "$BASE" = "POC" ]; then
+            echo "SF_USERNAME=${{ secrets.NTSBPOC_USER_NAME }}" >> $GITHUB_ENV
+            echo "SF_CONSUMER_KEY=${{ secrets.NTSBPOC_CONSUMER_KEY }}" >> $GITHUB_ENV
+            echo "SF_INSTANCE_URL=${{ vars.NTSBPOC_URL }}" >> $GITHUB_ENV
+            printf '%s' "${{ secrets.NTSBPOC_SERVER_KEY }}" > server.key
+          elif [ "$BASE" = "DEV" ]; then
+            echo "SF_USERNAME=${{ secrets.NTSBDEV_USER_NAME }}" >> $GITHUB_ENV
+            echo "SF_CONSUMER_KEY=${{ secrets.NTSBDEV_CONSUMER_KEY }}" >> $GITHUB_ENV
+            echo "SF_INSTANCE_URL=${{ vars.NTSBDEV_URL }}" >> $GITHUB_ENV
+            printf '%s' "${{ secrets.NTSBDEV_SERVER_KEY }}" > server.key
+          else
+            echo "Unsupported PR base branch: $BASE"
+            exit 1
+          fi
+
+          chmod 600 server.key
+
+      - name: Authenticate (JWT)
+        run: |
+          sf org login jwt \
+            --client-id "$SF_CONSUMER_KEY" \
+            --jwt-key-file server.key \
+            --username "$SF_USERNAME" \
+            --instance-url "$SF_INSTANCE_URL" \
+            --set-default
+
+          # Do NOT use --verbose (it prints access tokens)
+          sf org display
+
+      - name: Validate delta deploy (dry-run) and fail only when truly failed
+        run: |
+          sf project deploy start \
+            --source-dir "changed-sources/force-app" \
+            --test-level RunLocalTests \
+            --dry-run \
+            --json > deploy.json || true
+
+          STATUS="$(jq -r '.result.status // "UNKNOWN"' deploy.json)"
+          SUCCESS="$(jq -r '.result.success // false' deploy.json)"
+
+          echo "Deploy status: $STATUS"
+          echo "Deploy success: $SUCCESS"
+
+          if [ "$STATUS" = "Succeeded" ] && [ "$SUCCESS" = "true" ]; then
+            echo "Validation PASSED."
+            exit 0
+          fi
+
+          echo "Validation FAILED."
+          echo "Component failures:"
+          jq '.result.details.componentFailures // []' deploy.json || true
+          echo "Test failures:"
+          jq '.result.details.runTestResult.failures // []' deploy.json || true
+          exit 1
