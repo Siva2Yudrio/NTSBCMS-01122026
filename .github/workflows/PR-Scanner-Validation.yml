@@ -73,14 +73,16 @@ jobs:
           sf plugins install code-analyzer
           echo "Successfully installed Code Analyzer v5"
 
-      - name: Run Code Analyzer (Dual Run)
+      - name: Run Code Analyzer (Compatible Mode)
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # Run 1: Generate SARIF (|| true ensures the next step runs even if violations exist)
-          sf code-analyzer run --target "changed-sources/force-app" --format sarif --outfile scanner-results.sarif || true
+          # Run 1: SARIF
+          # -t = target/path, -f = format/output-file
+          sf code-analyzer run -t "changed-sources/force-app" -f sarif --outfile scanner-results.sarif || true
           
-          # Run 2: Generate JSON and Fail on Severity 1
-          sf code-analyzer run --target "changed-sources/force-app" --format json --outfile scanner-results.json --severity-threshold 1
+          # Run 2: JSON + Gating
+          # -s = severity-threshold/fail-on-severity
+          sf code-analyzer run -t "changed-sources/force-app" -f json --outfile scanner-results.json -s 1
 
       - name: Upload SARIF to GitHub Code Scanning
         # always() ensures this runs even if Run 2 failed the build
