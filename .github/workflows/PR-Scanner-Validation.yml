@@ -62,12 +62,25 @@ jobs:
 
           echo "Delta folder tree:"
           find changed-sources -maxdepth 4 -type d -print
-
-      - name: Stop if no Salesforce changes detected
+      # ----------------------------
+      # Checking the changes-- START--
+      # ----------------------------
+      - name: Check and log Salesforce changes
         run: |
-          if ! find changed-sources/force-app -type f | grep -q .; then
-            echo "No Salesforce changes detected. Skipping."
+          echo "Checking for changed files under changed-sources/force-app..."
+      
+          # List all files found (debugging aid)
+          echo "Files found:"
+          find changed-sources/force-app -type f || true
+      
+          # Count files (actual check)
+          FILE_COUNT=$(find changed-sources/force-app -type f | wc -l)
+      
+          if [ "$FILE_COUNT" -eq 0 ]; then
+            echo "No Salesforce metadata files detected. Skipping workflow."
             exit 0
+          else
+            echo "Found $FILE_COUNT Salesforce metadata file(s). Continuing..."
           fi
 
       # ----------------------------
