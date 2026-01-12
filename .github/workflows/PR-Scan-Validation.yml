@@ -1,0 +1,50 @@
+name: Salesforce PR Validation
+
+on:
+  pull_request:
+    branches: ["POC", "DEV"]
+    paths:
+      - 'force-app/**' # Only run if metadata changes
+
+jobs:
+  validate-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Checkout source code'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 'Install Salesforce CLI'
+        run: npm install -g @salesforce/cli
+
+      - name: 'Install sfdx-git-delta'
+        run: |
+          echo 'y' | sf plugins install sfdx-git-delta
+
+      # Compare the PR branch against the target branch (main)
+      - name: 'Generate Delta package'
+        run: |
+          mkdir delta
+          sf sgd:source:delta --to HEAD --from origin/main --output delta/ --generate-delta
+
+      - name: 'Prepare JWT Key'
+        run: echo "${{ secrets.SFDX_JWT_KEY }}" > server.key
+
+      - name: 'Authenticate'
+        run: |
+          sf org login jwt \
+            --client-id ${{ secrets.SFDX_CONSUMER_KEY }} \
+            --jwt-key-file server.key \
+            --username ${{ secrets.SFDX_USERNAME }} \
+            --instance-url https://test.salesforce.com \
+            --set-default
+
+      # VALIDATION ONLY (Dry Run)
+      - name: 'Validate Delta Changes'
+        run: |
+          sf project deploy validate \
+            --manifest delta/package/package.xml \
+            --post-destructive-changes delta/destructiveChanges/destructiveChanges.xml \
+            --wait 10 \
+            --test-level RunLocalTests
