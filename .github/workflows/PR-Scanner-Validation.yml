@@ -68,23 +68,26 @@ jobs:
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           # Remove the retired v4 plugin to prevent flag conflicts
-          sf plugins uninstall @salesforce/sfdx-scanner || true
+          sf plugins uninstall @salesforce/sfdx-scanner > /dev/null 2>&1 || true
           # Install the 2026 standard v5 plugin
           sf plugins install code-analyzer
           echo "Successfully installed Code Analyzer v5"
 
-      - name: Run Code Analyzer (Critical gate)
+      - name: Run Code Analyzer (Dual Run)
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # 1. Force the CLI to index the new plugin
-          sf code-analyzer --help
+          # Run 1: Generate SARIF (|| true ensures the next step runs even if violations exist)
+          sf code-analyzer run --target "changed-sources/force-app" --format sarif --outfile scanner-results.sarif || true
           
-          # 2. Run the analysis using v5 syntax
-          sf code-analyzer run \
-            --path "changed-sources/force-app" \
-            --output-file scanner-results.sarif \
-            --output-file scanner-results.json \
-            --fail-on-severity 1
+          # Run 2: Generate JSON and Fail on Severity 1
+          sf code-analyzer run --target "changed-sources/force-app" --format json --outfile scanner-results.json --severity-threshold 1
+
+      - name: Upload SARIF to GitHub Code Scanning
+        # always() ensures this runs even if Run 2 failed the build
+        if: always() && steps.check_changes.outputs.has_changes == 'true'
+        uses: github/codeql-action/upload-sarif@v4 # Updated to v4 for 2026
+        with:
+          sarif_file: scanner-results.sarif
 
       - name: Upload SARIF to GitHub Code Scanning
         # always() ensures this runs even if 'Run Code Analyzer' failed the job
