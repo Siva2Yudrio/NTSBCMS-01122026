@@ -29,14 +29,14 @@ jobs:
           sf sgd:source:delta --to HEAD --from origin/main --output delta/ --generate-delta
 
       - name: 'Prepare JWT Key'
-        run: echo "${{ secrets.SFDX_JWT_KEY }}" > server.key
+        run: echo "${{ secrets.NTSBPOC_SERVER_KEY }}" > server.key
 
       - name: 'Authenticate'
         run: |
           sf org login jwt \
-            --client-id ${{ secrets.SFDX_CONSUMER_KEY }} \
+            --client-id ${{ secrets.NTSBPOC_CONSUMER_KEY }} \
             --jwt-key-file server.key \
-            --username ${{ secrets.SFDX_USERNAME }} \
+            --username ${{ secrets.NTSBPOC_USER_NAME }} \
             --instance-url https://test.salesforce.com \
             --set-default
 
