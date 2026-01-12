@@ -76,7 +76,10 @@ jobs:
       - name: Run Code Analyzer (Critical gate)
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # v5 supports multiple --output-file flags
+          # 1. Force the CLI to index the new plugin
+          sf code-analyzer --help
+          
+          # 2. Run the analysis using v5 syntax
           sf code-analyzer run \
             --path "changed-sources/force-app" \
             --output-file scanner-results.sarif \
