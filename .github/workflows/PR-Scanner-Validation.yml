@@ -85,17 +85,17 @@ jobs:
             -f scanner-results.html \
             -s 1
 
-      # [FIXED] Rewrite Paths Safely
+      # [FIXED] Rewrite Paths Safely using JQ
       - name: Fix SARIF Paths
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # OLD (Broken): sed -i 's|.*changed-sources/||g' ... (Ate the JSON keys)
-          # NEW (Safe): Only matches the path inside the quotes
-          sed -i 's|"[^"]*changed-sources/|"|g' scanner-results.sarif
+          # Safely strips "changed-sources/" prefix from URIs
+          jq '(.runs[].results[].locations[].physicalLocation.artifactLocation.uri) |= sub("^changed-sources/"; "")' scanner-results.sarif > scanner-results-clean.sarif
+          mv scanner-results-clean.sarif scanner-results.sarif
           
-          # Verification: Print the first 20 lines to the log
-          echo "--- Verifying SARIF Structure ---"
-          head -n 20 scanner-results.sarif
+          # Verification
+          echo "--- Verifying SARIF Paths ---"
+          grep -m 5 "uri" scanner-results.sarif
       
       # 1. Official GitHub Security Integration
       - name: Upload SARIF to GitHub Code Scanning
@@ -105,7 +105,7 @@ jobs:
           sarif_file: scanner-results.sarif
           category: "salesforce-code-analyzer"
 
-      # 2. Downloadable ZIP backup (Restored)
+      # 2. Downloadable ZIP backup (Includes HTML)
       - name: Upload analyzer reports as artifacts
         if: always() && steps.check_changes.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
