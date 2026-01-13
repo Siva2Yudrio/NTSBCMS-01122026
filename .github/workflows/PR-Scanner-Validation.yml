@@ -82,6 +82,7 @@ jobs:
             -t "changed-sources/force-app" \
             -f scanner-results.sarif \
             -f scanner-results.json \
+            -f scanner-results.html \
             -s 1
 
       # [FIXED] Rewrite Paths Safely
@@ -113,6 +114,7 @@ jobs:
           path: |
             scanner-results.sarif
             scanner-results.json
+            scanner-results.html
           if-no-files-found: warn
       ### -- Salesforce Code Analyzer --- Ends Here ----
       - name: Select target org (POC/DEV) + create JWT key file
