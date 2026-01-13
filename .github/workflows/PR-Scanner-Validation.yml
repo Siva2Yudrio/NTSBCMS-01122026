@@ -64,20 +64,16 @@ jobs:
           echo "Found $FILE_COUNT file(s). Continuing..."
           echo "has_changes=true" >> $GITHUB_OUTPUT
 
-      ### -- Salesforce Code Analyzer --- Starts Here ----
+      ### -- Salesforce Code Analyzer --- Starts Here ----      
       - name: Install Salesforce Code Analyzer
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # Remove retired v4 plugin to prevent conflicts
           sf plugins uninstall @salesforce/sfdx-scanner > /dev/null 2>&1 || true
-          # Install the 2026 standard v5 plugin
           sf plugins install code-analyzer
-          echo "Successfully installed Code Analyzer v5"
 
       - name: Run Code Analyzer (v5 Standard)
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # v5 supports multiple -f flags for simultaneous formats
           sf code-analyzer run \
             -t "changed-sources/force-app" \
             -f scanner-results.sarif \
@@ -85,19 +81,17 @@ jobs:
             -f scanner-results.html \
             -s 1
 
-      # [FIXED] Rewrite Paths Safely using JQ
+      # [CRITICAL FIX] Global Path Correction
       - name: Fix SARIF Paths
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # Safely strips "changed-sources/" prefix from URIs
-          jq '(.runs[].results[].locations[].physicalLocation.artifactLocation.uri) |= sub("^changed-sources/"; "")' scanner-results.sarif > scanner-results-clean.sarif
-          mv scanner-results-clean.sarif scanner-results.sarif
+          # Strips "changed-sources/" from artifacts AND results
+          sed -i 's|changed-sources/||g' scanner-results.sarif
           
-          # Verification
-          echo "--- Verifying SARIF Paths ---"
+          # Debug proof
+          echo "--- Verifying Clean Paths ---"
           grep -m 5 "uri" scanner-results.sarif
       
-      # 1. Official GitHub Security Integration
       - name: Upload SARIF to GitHub Code Scanning
         if: always() && steps.check_changes.outputs.has_changes == 'true'
         uses: github/codeql-action/upload-sarif@v4
@@ -105,7 +99,6 @@ jobs:
           sarif_file: scanner-results.sarif
           category: "salesforce-code-analyzer"
 
-      # 2. Downloadable ZIP backup (Includes HTML)
       - name: Upload analyzer reports as artifacts
         if: always() && steps.check_changes.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
