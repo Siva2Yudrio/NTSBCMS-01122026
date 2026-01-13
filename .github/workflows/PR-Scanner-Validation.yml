@@ -84,6 +84,7 @@ jobs:
             -f scanner-results.json \
             -s 1
 
+      # 1. Official GitHub Security Integration
       - name: Upload SARIF to GitHub Code Scanning
         # always() ensures this runs even if Run 2 failed the build
         if: always() && steps.check_changes.outputs.has_changes == 'true'
@@ -93,13 +94,7 @@ jobs:
           # This unique category prevents the "only one run allowed" error
           category: "salesforce-code-analyzer"
 
-      - name: Upload SARIF to GitHub Code Scanning
-        # always() ensures this runs even if 'Run Code Analyzer' failed the job
-        if: always() && steps.check_changes.outputs.has_changes == 'true'
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: scanner-results.sarif
-
+      # 2. Downloadable ZIP backup
       - name: Upload analyzer reports as artifacts
         if: always() && steps.check_changes.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
