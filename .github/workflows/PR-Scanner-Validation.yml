@@ -64,10 +64,11 @@ jobs:
           echo "Found $FILE_COUNT file(s). Continuing..."
           echo "has_changes=true" >> $GITHUB_OUTPUT
 
+      ### -- Salesforce Code Analyzer --- Starts Here ----
       - name: Install Salesforce Code Analyzer
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # Remove the retired v4 plugin to prevent flag conflicts
+          # Remove retired v4 plugin to prevent conflicts
           sf plugins uninstall @salesforce/sfdx-scanner > /dev/null 2>&1 || true
           # Install the 2026 standard v5 plugin
           sf plugins install code-analyzer
@@ -76,33 +77,34 @@ jobs:
       - name: Run Code Analyzer (v5 Standard)
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          # In v5 (2026), -f (or --output-file) handles both format and filename.
-          # You can specify it multiple times to get multiple formats in one run.
+          # v5 supports multiple -f flags for simultaneous formats
           sf code-analyzer run \
             -t "changed-sources/force-app" \
             -f scanner-results.sarif \
             -f scanner-results.json \
             -s 1
-      # [CRITICAL FIX] Rewrite Paths for GitHub
-      # Removes "changed-sources/" and any absolute prefix so GitHub matches files correctly.
+
+      # [FIXED] Rewrite Paths Safely
       - name: Fix SARIF Paths
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
-          sed -i 's|.*changed-sources/||g' scanner-results.sarif
-          # Optional: Print first 20 lines to verify the path is now "force-app/..."
-          head -n 20 scanner-results.sarif
+          # OLD (Broken): sed -i 's|.*changed-sources/||g' ... (Ate the JSON keys)
+          # NEW (Safe): Only matches the path inside the quotes
+          sed -i 's|"[^"]*changed-sources/|"|g' scanner-results.sarif
           
+          # Verification: Print the first 20 lines to the log
+          echo "--- Verifying SARIF Structure ---"
+          head -n 20 scanner-results.sarif
+      
       # 1. Official GitHub Security Integration
       - name: Upload SARIF to GitHub Code Scanning
-        # always() ensures this runs even if Run 2 failed the build
         if: always() && steps.check_changes.outputs.has_changes == 'true'
-        uses: github/codeql-action/upload-sarif@v4 # Updated to v4 for 2026
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: scanner-results.sarif
-          # This unique category prevents the "only one run allowed" error
           category: "salesforce-code-analyzer"
 
-      # 2. Downloadable ZIP backup
+      # 2. Downloadable ZIP backup (Restored)
       - name: Upload analyzer reports as artifacts
         if: always() && steps.check_changes.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v4
@@ -112,7 +114,7 @@ jobs:
             scanner-results.sarif
             scanner-results.json
           if-no-files-found: warn
-
+      ### -- Salesforce Code Analyzer --- Ends Here ----
       - name: Select target org (POC/DEV) + create JWT key file
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
